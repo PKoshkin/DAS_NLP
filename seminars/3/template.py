@@ -15,7 +15,6 @@ def train_hmm(tagged_sents):
         p_t, p_w_t, p_t_t - tuple of 3 elements:
         p_t - dict(float), tag->proba
         p_w_t - dict(dict(float), tag -> word -> proba
-        p_t_t - dict(dict(float), previous_tag -> tag -> proba
     """
     
     # Initialization 
@@ -63,4 +62,23 @@ def viterbi_algorithm(test_tokens_list, p_t, p_w_t, p_t_t):
         list of hidden tags
     """
     
-    # Your code here
+    tags = p_t.keys()
+    delta = [np.array([
+        p_w_t[(test_tokens_list[0], k)] * p_t[k] for k in tags
+    ])]
+    s = []
+    for i in range(1, len(test_tokens_list)):
+        delta.append(np.array([
+            np.max([p_w_t[(test_tokens_list[i], k)] * p_t_t[(m, k)] * delta[i - 1][m] for m in tags])
+            for tag in tags
+        ]))
+        s.append(np.array([
+            np.argmax([p_w_t[(test_tokens_list[i], k)] * p_t_t[(m, k)] * delta[i - 1][m] for m in tags])
+            for tag in tags
+        ]))
+    delta = np.array(delta)
+
+    result = [np.argmax(delta[-1, :])]
+    for link in reversed(s):
+        result.append(tokens[link[result[-1]]])
+    return result[::-1]

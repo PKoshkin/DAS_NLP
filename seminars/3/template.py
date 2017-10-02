@@ -1,6 +1,7 @@
 from collections import Counter, defaultdict
 import numpy as np
 
+
 def train_hmm(tagged_sents):
     """Hidden Markov Model. 
     Calucalte p(tag), p(word|tag), p(tag|tag) from corpus
@@ -17,7 +18,31 @@ def train_hmm(tagged_sents):
         p_t_t - dict(dict(float), previous_tag -> tag -> proba
     """
     
-    # Your code here
+    # Initialization 
+    delta = 1e-24
+    counter_tag = Counter()
+    counter_tag_tag = Counter()
+    counter_tag_word = Counter()
+    for tag, word in tagged_sents:
+        counter_tag[tag] += 1
+        counter_tag_word[(tag, word)] += 1
+    for tag, next_tag in zip(tagged_sents, tagged_sents[1:]):
+        counter_tag_tag[(tag, next_tag)] += 1
+    tags = {tag for word, tag in tagged_sents}
+    words = {word for word, tag in tagged_sents}
+    p_t_t = defaultdict(dict)
+    p_w_t = defaultdict(dict)
+    p_t = dict()
+
+    # Computing probabilities
+    for tag in tags:
+        for word in words:
+            p_w_t[tag][word] += ((counter_tag_word[(tag, word)] + delta) /
+                                 (counter_tag[tag] + delta * len(tags)))
+        for next_tag in tags:
+            p_w_t[tag][tags] += ((counter_tag_tag[(tag, next_tag)] + delta) /
+                                 (counter_tag[tag] + delta * len(tags)))
+        p_t[tag] += 1 / len(tags)
 
     return p_t, p_w_t, p_t_t
 

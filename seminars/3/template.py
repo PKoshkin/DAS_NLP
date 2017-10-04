@@ -9,12 +9,13 @@ def train_hmm(tagged_sents):
     Args:
         tagged_sents: list of list of tokens. 
             Example: 
-            [('dog', 'N'), ('eats', 'V')]
+            [[('dog', 'NOUN'), ('eats', 'VERB'), ...], ...]
 
     Returns:
         p_t, p_w_t, p_t_t - tuple of 3 elements:
         p_t - dict(float), tag->proba
-        p_w_t - dict(dict(float), tag -> word -> proba
+        p_w_t - dict(dict(float)), tag -> word -> proba
+        p_t_t - dict(dict(float)), previous_tag -> tag -> proba
     """
     
     # Initialization 
@@ -22,24 +23,27 @@ def train_hmm(tagged_sents):
     counter_tag = Counter()
     counter_tag_tag = Counter()
     counter_tag_word = Counter()
-    for tag, word in tagged_sents:
-        counter_tag[tag] += 1
-        counter_tag_word[(tag, word)] += 1
-    for tag, next_tag in zip(tagged_sents, tagged_sents[1:]):
-        counter_tag_tag[(tag, next_tag)] += 1
-    tags = {tag for word, tag in tagged_sents}
-    words = {word for word, tag in tagged_sents}
-    p_t_t = defaultdict(dict)
-    p_w_t = defaultdict(dict)
-    p_t = dict()
+    tags = set()
+    words = set()
+    for sentence in tagged_sents:
+        for word, tag in sentence:
+            counter_tag[tag] += 1
+            counter_tag_word[(tag, word)] += 1
+        for taged, next_taged in zip(sentence, sentence[1:]):
+            counter_tag_tag[(taged[1], next_taged[1])] += 1
+        tags.update({tag for word, tag in sentence})
+        words.update({word for word, tag in sentence})
 
+    p_t_t = defaultdict(lambda: defaultdict(float))
+    p_w_t = defaultdict(lambda: defaultdict(float))
+    p_t = defaultdict(float)
     # Computing probabilities
     for tag in tags:
         for word in words:
-            p_w_t[tag][word] += ((counter_tag_word[(tag, word)] + delta) /
+            p_w_t[word][tag] += ((counter_tag_word[(tag, word)] + delta) /
                                  (counter_tag[tag] + delta * len(tags)))
         for next_tag in tags:
-            p_w_t[tag][tags] += ((counter_tag_tag[(tag, next_tag)] + delta) /
+            p_t_t[tag][next_tag] += ((counter_tag_tag[(tag, next_tag)] + delta) /
                                  (counter_tag[tag] + delta * len(tags)))
         p_t[tag] += 1 / len(tags)
 
@@ -62,23 +66,25 @@ def viterbi_algorithm(test_tokens_list, p_t, p_w_t, p_t_t):
         list of hidden tags
     """
     
-    tags = p_t.keys()
+    tags = np.array([key for key in p_t.keys()])
     delta = [np.array([
-        p_w_t[(test_tokens_list[0], k)] * p_t[k] for k in tags
+        p_w_t[test_tokens_list[0]][k] * p_t[k] for k in tags
     ])]
     s = []
     for i in range(1, len(test_tokens_list)):
         delta.append(np.array([
-            np.max([p_w_t[(test_tokens_list[i], k)] * p_t_t[(m, k)] * delta[i - 1][m] for m in tags])
-            for tag in tags
+            np.max([p_w_t[test_tokens_list[i]][k] * p_t_t[m][k] * delta[i - 1][m] for m in range(len(tags))])
+            for k in tags
         ]))
         s.append(np.array([
-            np.argmax([p_w_t[(test_tokens_list[i], k)] * p_t_t[(m, k)] * delta[i - 1][m] for m in tags])
-            for tag in tags
+            np.argmax([p_w_t[test_tokens_list[i]][k] * p_t_t[m][k] * delta[i - 1][m] for m in range(len(tags))])
+            for k in tags
         ]))
     delta = np.array(delta)
-
-    result = [np.argmax(delta[-1, :])]
+    
+    result = [tags[np.argmax(delta[-1, :])]]
+    previous_link = np.argmax(delta[-1, :])
     for link in reversed(s):
-        result.append(tokens[link[result[-1]]])
+        result.append(tags[link[previous_link]])
+        previous_link = link[previous_link]
     return result[::-1]

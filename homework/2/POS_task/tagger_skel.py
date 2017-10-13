@@ -9,7 +9,7 @@
 
 
 def read_tags(path):
-        """
+    """
     Read a list of possible tags from file and return the list.
     """
     ...
@@ -43,7 +43,13 @@ def tagging_quality(ref, out):
     """
     Compute tagging quality and reutrn TaggingQuality object.
     """
-    ...
+    nwords = 0
+    ncorrect = 0
+    import itertools
+    for ref_sentence, out_sentence in itertools.zip_longest(ref, out):
+        for ref_word, out_word in itertools.zip_longest():
+            ...
+    return ncorrect / nwords
 
 
 ###############################################################################
@@ -65,15 +71,24 @@ class Value:
         ...
 
     def assign(self, other):
+        """
+        self = other
+        other is Value.
+        """
         ...
 
     def assign_mul(self, coeff):
+        """
+        self = self * coeff
+        coeff is float.
+        """
         ...
 
     def assign_madd(self, x, coeff):
         """
         self = self + x * coeff
         x can be either Value or Update.
+        coeff is float.
         """
         ...
 
@@ -83,14 +98,24 @@ class Update:
     Sparse object that holds an update of parameters.
     """
 
-    def __init__(self, hashes=None, values=None):
-        ...
+    def __init__(self, positions=None, values=None):
+        """
+        positions: array of int
+        values: array of float
+        """
 
     def assign_mul(self, coeff):
+        """
+        self = self * coeff
+        coeff: float
+        """
         ...
 
     def assign_madd(self, update, coeff):
-        ...
+        """
+        self = self + update * coeff
+        coeff: float
+        """
 
 
 ###############################################################################
@@ -109,16 +134,19 @@ class LinearModel:
     """
 
     def __init__(self, n):
-        ...
+        self._params = Value(n)
 
     def params(self):
-        ...
+        return self._params
 
     def score(self, features):
-        ...
+        """
+        features: Update
+        """
+        return self._params.dot(features)
 
     def gradient(self, features, score):
-        ...
+        return features
 
 
 ###############################################################################
@@ -129,7 +157,10 @@ class LinearModel:
 
 
 Hypo = collections.namedtuple('Hypo', ['prev', 'pos', 'tagged_word', 'score'])
-
+# prev: previous Hypo
+# pos: position of word (0-based)
+# tagged_word: tagging of source_sentence[pos]
+# score: sum of scores over edges
 
 ###############################################################################
 #                                                                             #
@@ -156,7 +187,7 @@ TaggerParams = collections.namedtuple('FeatureParams', [
 
 
 class FeatureComputer:
-    def __init__(self, ...):
+    def __init__(self, tagger_params, source_sentence):
         ...
 
     def compute_features(self, hypo):
@@ -179,12 +210,13 @@ class BeamSearchTask:
     function.
     """
 
-    def __init__(self, ...):
+    def __init__(self, tagger_params, source_sentence, model, tags):
         ...
 
-    def num_stacks(self):
+    def total_num_steps(self):
         """
-        Return total number of stacks.
+        Number of hypotheses between beginning and end (number of words in
+        the sentence).
         """
         ...
 
@@ -195,6 +227,8 @@ class BeamSearchTask:
         """
         Given Hypo, return a list of its possible expansions.
         'hypo' might be None -- return a list of initial hypos then.
+
+        Compute hypotheses' scores inside this function!
         """
         ...
 
@@ -206,19 +240,11 @@ class BeamSearchTask:
         ...
 
 
-def beam_search(beam_search_task, feature_computer, model):
+def beam_search(beam_search_task):
     """
     Return list of stacks.
     Each stack contains several hypos, sorted by score in descending 
     order (i.e. better hypos first).
-    """
-    ...
-
-
-def make_tag_lattice(golden_sentence, tags):
-    """
-    Create a tag lattice from words of original sentence.
-    Ignore tags in golden_sentence.
     """
     ...
 
@@ -264,15 +290,50 @@ class UnstructuredPerceptronOptimizationTask(OptimizationTask):
 
 
 class StructuredPerceptronOptimizationTask(OptimizationTask):
-    def __init__(self, ...):
-        ...
+    def __init__(self, tagger_params, tags):
+        self.tagger_params = tagger_params
+        self.model = LinearModel(...)
+        self.tags = tags
 
     def params(self):
-        ...
+        return self.model.params()
 
     def loss_and_gradient(self, golden_sentence):
-        ...
+        # Do beam search.
+        beam_search_task = BeamSearchTask(
+            self.tagger_params, 
+            [golden_tagged_word.text for golden_tagged_word in golden_sentence], 
+            self.model, 
+            self.tags
+            )
+        stacks = beam_search(beam_search_task)
 
+        # Compute chain of golden hypos (and their scores!).
+        golden_hypo = None
+        feature_computer = ...
+        for i in range(len(golden_sentence)):
+            new_golden_hypo = ...
+            golden_hypo = golden_hypo
+
+        # Find where to update.
+        golden_head = ...
+        rival_head = ...
+
+        # Compute gradient.
+        grad = Update()
+        while golden_head and rival_head:
+            rival_features = feature_computer.compute_features(rival_head)
+            grad.assign_madd(self.model.gradient(rival_features, score=None), 1)
+
+            golden_features = feature_computer.compute_features(golden_head)
+            grad.assign_madd(self.model.gradient(golden_features, score=None), -1)
+
+
+            golden_head = golden_head.prev
+            rival_head = rival_head.prev
+
+        return grad
+        
 
 ###############################################################################
 #                                                                             #
@@ -285,7 +346,7 @@ SGDParams = collections.namedtuple('SGDParams', [
     'epochs',
     'learning_rate',
     'minibatch_size',
-    'average'
+    'average' # bool or int
     ])
 
 

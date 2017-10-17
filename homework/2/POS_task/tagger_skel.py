@@ -2,7 +2,8 @@
 
 import numpy as np
 import cityhash
-from collections import Counter()
+from collections import Counter
+from collections import namedtuple
 
 ###############################################################################
 #                                                                             #
@@ -21,7 +22,7 @@ def read_tags(path):
 
 # Word: str
 # Sentence: list of str
-TaggedWord = collections.namedtuple('TaggedWord', ['text', 'tag'])
+TaggedWord = namedtuple('TaggedWord', ['text', 'tag'])
 # TaggedSentence: list of TaggedWord
 # Tags: list of TaggedWord
 # TagLattice: list of Tags
@@ -55,7 +56,7 @@ def write_tagged_sentence(tagged_sentence, f):
     file.close()
 
 
-TaggingQuality = collections.namedtuple('TaggingQuality', ['acc'])
+TaggingQuality = namedtuple('TaggingQuality', ['acc'])
 
 
 def tagging_quality(ref, out):
@@ -187,7 +188,7 @@ class LinearModel:
 ###############################################################################
 
 
-Hypo = collections.namedtuple('Hypo', ['prev', 'pos', 'tagged_word', 'score'])
+Hypo = namedtuple('Hypo', ['prev', 'pos', 'tagged_word', 'score'])
 # prev: previous Hypo
 # pos: position of word (0-based)
 # tagged_word: tagging of source_sentence[pos]
@@ -208,7 +209,7 @@ def h(x):
     return cityhash.CityHash64(repr(x))
 
 
-TaggerParams = collections.namedtuple('FeatureParams', [
+TaggerParams = namedtuple('FeatureParams', [
     'src_window',
     'dst_order',
     'max_suffix',
@@ -448,7 +449,7 @@ class StructuredPerceptronOptimizationTask(OptimizationTask):
 ###############################################################################
 
 
-SGDParams = collections.namedtuple('SGDParams', [
+SGDParams = namedtuple('SGDParams', [
     'epochs',
     'learning_rate',
     'minibatch_size',

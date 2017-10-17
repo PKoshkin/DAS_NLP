@@ -219,8 +219,8 @@ TaggerParams = collections.namedtuple('FeatureParams', [
 
 class FeatureComputer:
     def __init__(self, tagger_params, source_sentence):
-        self.tagger_params = tagger_params
-        self.source_sentence = source_sentence
+        self._tagger_params = tagger_params
+        self._source_sentence = source_sentence
 
     def compute_features(self, hypo):
         """
@@ -229,26 +229,26 @@ class FeatureComputer:
         features = []
         # neighboors words
         for index in range(
-            max(hypo.pos - self.tagger_params.src_window, 0),
-            min(hypo.pos + self.tagger_params.src_window + 1, len(self.source_sentence))
+            max(hypo.pos - self._tagger_params.src_window, 0),
+            min(hypo.pos + self._tagger_params.src_window + 1, len(self._source_sentence))
         ):
             features.appned(h(hypo.tagged_word.tag,
-                self.source_sentence[index]
-            ) % self.tagger_params.nparams)
+                self._source_sentence[index]
+            ) % self._tagger_params.nparams)
 
         # previous tags
         tmp_hypo = hypo
         while tmp_hypo != None:
             features.appned(h(hypo.tagged_word.tag,
                 tmp_hypo.tagged_word.tag
-            ) % self.tagger_params.nparams)
+            ) % self._tagger_params.nparams)
             tmp_hypo = tmp_hypo.prev
 
         # suffixes
-        for i in range(1, self.tagger_params.max_suffix):
+        for i in range(1, self._tagger_params.max_suffix):
             features.appned(h(hypo.tagged_word.tag,
                 hypo.tagged_word.word[-i:]
-            ) % self.tagger_params.nparams)
+            ) % self._tagger_params.nparams)
 
         return Update(positions=features, values=np.ones(len(features)))
 
@@ -267,17 +267,21 @@ class BeamSearchTask:
     """
 
     def __init__(self, tagger_params, source_sentence, model, tags):
-        ...
+        self._tagger_params = tagger_params
+        self._source_sentence = source_sentence
+        self._model = model
+        self._tags = tags
+        self._feature_computer = FeatureComputer(tagger_params, source_sentence)
 
     def total_num_steps(self):
         """
         Number of hypotheses between beginning and end (number of words in
         the sentence).
         """
-        ...
+        return len(self._source_sentence)
 
     def beam_size(self):
-        ...
+        return self._tagger_params.beam_size
 
     def expand(self, hypo):
         """
@@ -286,14 +290,36 @@ class BeamSearchTask:
 
         Compute hypotheses' scores inside this function!
         """
-        ...
+        if hypo is None:
+            return [
+                Hypo(
+                    prev=None,
+                    pos=0,
+                    tagged_word=TaggedWord(text=self._source_sentence[0], tag=tag),
+                    score=0
+                )
+                for tag in tags
+            ]
+        else:
+            hypos = []
+            for tag in tags:
+                new_hypo = Hypo(
+                    prev=hypo,
+                    pos=(hypo.pos + 1),
+                    tagged_word=TaggedWord(text=self._source_sentence[hypo.pos + 1], tag=tag),
+                    score=0
+                )   
+                hypos.append(new_hypo._replace(
+                    score=self._model.score(self._feature_computer.compute_features(new_hypo))
+                ))
+            return hypos
 
     def recombo_hash(self, hypo):
         """
         If two hypos have the same recombination hashes, they can be collapsed
         together, leaving only the hypothesis with a better score.
         """
-        ...
+        return hypo.score
 
 
 def beam_search(beam_search_task):
@@ -302,8 +328,22 @@ def beam_search(beam_search_task):
     Each stack contains several hypos, sorted by score in descending 
     order (i.e. better hypos first).
     """
-    ...
-
+    hypos = sorted(
+        beam_search_task.expand(None),
+        key=(lambda hypo: hypo.score)
+    )[beam_search_task.beam_size():]
+    stacks = [hypos]
+    for step in range(beam_search_task.total_num_steps() - 1):
+        new_hypos = []
+        for hypo in hypos:
+            new_hypos.expand(beam_search_task.expand(hypo))
+        hypos = sorted(
+            new_hypos
+            key=(lambda hypo: hypo.score)
+        )[beam_search_task.beam_size():]
+        stacks.appned(hypos)
+    return stacks
+        
 
 ###############################################################################
 #                                                                             #

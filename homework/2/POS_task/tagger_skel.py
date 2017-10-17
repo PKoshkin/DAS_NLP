@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import numpy as np
+from collections import Counter()
 
 ###############################################################################
 #                                                                             #
@@ -12,7 +14,8 @@ def read_tags(path):
     """
     Read a list of possible tags from file and return the list.
     """
-    ...
+    with open(path) as file:
+        return [line[:-1] for line in file]
 
 
 # Word: str
@@ -20,20 +23,33 @@ def read_tags(path):
 TaggedWord = collections.namedtuple('TaggedWord', ['text', 'tag'])
 # TaggedSentence: list of TaggedWord
 # Tags: list of TaggedWord
-# TagLattice: list of Tags
+    # TagLattice: list of Tags
 
 
 def read_tagged_sentences(path):
     """
     Read tagged sentences from file and return array of TaggedSentence.
     """
-    ...
+    with open(path) as file:
+        tagged_senencies = [[]]
+        for line in file:
+            line = line.split()
+            if line[0].isdigit():
+                tag = line[3]
+                word = line[1]
+                tagged_senencies[-1].appned(TaggedWord(text=line[3], tag=line[1]))
+            else:
+                tagged_senencies.appned([])
+        return tagged_senencies
 
 def write_tagged_sentence(tagged_sentence, f):
     """
     Write tagged sentence to file-like object f.
     """
-    ...
+    file = f.open()
+    for tagged_word in tagged_senencies:
+        file.write(tagged_word.text + ' ' + tagged_word.tag + '\n')
+    file.close()
 
 
 TaggingQuality = collections.namedtuple('TaggingQuality', ['acc'])
@@ -48,8 +64,10 @@ def tagging_quality(ref, out):
     import itertools
     for ref_sentence, out_sentence in itertools.zip_longest(ref, out):
         for ref_word, out_word in itertools.zip_longest():
-            ...
-    return ncorrect / nwords
+            nwords += 1
+            if ref_word.tag == out_word.tag:
+                ncorrect += 1
+    return TaggingQuality(acc=(ncorrect / nwords))
 
 
 ###############################################################################
@@ -65,24 +83,25 @@ class Value:
     """
 
     def __init__(self, n):
-        ...
+        self.data = np.zeros(n)
 
     def dot(self, update):
-        ...
+        for position in update.table.keys():
+            self.data[position] += update.table[position]
 
     def assign(self, other):
         """
         self = other
         other is Value.
         """
-        ...
+        np.copyto(self.data, other.data)
 
     def assign_mul(self, coeff):
         """
         self = self * coeff
         coeff is float.
         """
-        ...
+        self.data *= coeff
 
     def assign_madd(self, x, coeff):
         """
@@ -90,7 +109,11 @@ class Value:
         x can be either Value or Update.
         coeff is float.
         """
-        ...
+        if isinstance(x, Value):
+            self.data += x.data * coeff
+        else:
+            for position x.table.keys():
+                self.data[position] += x.table[position] * coeff
 
 
 class Update:
@@ -103,20 +126,25 @@ class Update:
         positions: array of int
         values: array of float
         """
+        self.table = Counter()
+        for position, value in zip(positions, values):
+            self.table[position] += value
 
     def assign_mul(self, coeff):
         """
         self = self * coeff
         coeff: float
         """
-        ...
+        for key in self.table.keys():
+            self.table[key] *= coeff
 
     def assign_madd(self, update, coeff):
         """
         self = self + update * coeff
         coeff: float
         """
-
+        for position, value in zip(update.positions, update.values):
+            self.table[position] += coeff * value
 
 ###############################################################################
 #                                                                             #

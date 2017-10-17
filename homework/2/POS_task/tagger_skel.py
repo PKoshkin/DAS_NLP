@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import numpy as np
+import cityhash
 from collections import Counter()
 
 ###############################################################################
@@ -40,6 +41,8 @@ def read_tagged_sentences(path):
                 tagged_senencies[-1].appned(TaggedWord(text=line[3], tag=line[1]))
             else:
                 tagged_senencies.appned([])
+        if len(tagged_senencies[-1]) == 0:
+            tagged_senencies = tagged_senencies[:-1]
         return tagged_senencies
 
 def write_tagged_sentence(tagged_sentence, f):
@@ -211,18 +214,43 @@ TaggerParams = collections.namedtuple('FeatureParams', [
     'max_suffix',
     'beam_size',
     'nparams'
-    ])
+])
 
 
 class FeatureComputer:
     def __init__(self, tagger_params, source_sentence):
-        ...
+        self.tagger_params = tagger_params
+        self.source_sentence = source_sentence
 
     def compute_features(self, hypo):
         """
         Compute features for a given Hypo and return Update.
         """
-        ...
+        features = []
+        # neighboors words
+        for index in range(
+            max(hypo.pos - self.tagger_params.src_window, 0),
+            min(hypo.pos + self.tagger_params.src_window + 1, len(self.source_sentence))
+        ):
+            features.appned(h(hypo.tagged_word.tag,
+                self.source_sentence[index]
+            ) % self.tagger_params.nparams)
+
+        # previous tags
+        tmp_hypo = hypo
+        while tmp_hypo != None:
+            features.appned(h(hypo.tagged_word.tag,
+                tmp_hypo.tagged_word.tag
+            ) % self.tagger_params.nparams)
+            tmp_hypo = tmp_hypo.prev
+
+        # suffixes
+        for i in range(1, self.tagger_params.max_suffix):
+            features.appned(h(hypo.tagged_word.tag,
+                hypo.tagged_word.word[-i:]
+            ) % self.tagger_params.nparams)
+
+        return Update(positions=features, values=np.ones(len(features)))
 
 
 ###############################################################################

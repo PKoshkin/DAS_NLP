@@ -375,20 +375,20 @@ class OptimizationTask:
 
 
 class UnstructuredPerceptronOptimizationTask(OptimizationTask):
-    def __init__(self, ...):
-        ...
+    def __init__(self, tagger_params, tags):
+        raise NotImplementedError()
 
     def params(self):
-        ...
+        raise NotImplementedError()
 
     def loss_and_gradient(self, golden_sentence):
-        ...
+        raise NotImplementedError()
 
 
 class StructuredPerceptronOptimizationTask(OptimizationTask):
     def __init__(self, tagger_params, tags):
         self.tagger_params = tagger_params
-        self.model = LinearModel(...)
+        self.model = LinearModel(tagger_params.nparams)
         self.tags = tags
 
     def params(self):
@@ -401,19 +401,29 @@ class StructuredPerceptronOptimizationTask(OptimizationTask):
             [golden_tagged_word.text for golden_tagged_word in golden_sentence], 
             self.model, 
             self.tags
-            )
+        )
         stacks = beam_search(beam_search_task)
 
         # Compute chain of golden hypos (and their scores!).
-        golden_hypo = None
-        feature_computer = ...
-        for i in range(len(golden_sentence)):
-            new_golden_hypo = ...
-            golden_hypo = golden_hypo
-
-        # Find where to update.
-        golden_head = ...
-        rival_head = ...
+        golden_head = None
+        feature_computer = FeatureComputer(self.tagger_params, golden_sentence)
+        for i, word in enumerate(golden_sentence):
+            golden_head= Hypo(
+                prev=golden_head,
+                pos=i,
+                tagged_word=word,
+                score=0
+            )
+            golden_head._replace(self.model.score(
+                feature_computer.compute_features(
+                    golden_head
+                )
+            ))
+            if golden_head.score < stacks[i][tagger_params.beam_size - 1]:
+                rival_head = stacks[i][0]
+                break
+        else:
+            rival_head = stacks[-1][0]
 
         # Compute gradient.
         grad = Update()
@@ -429,7 +439,7 @@ class StructuredPerceptronOptimizationTask(OptimizationTask):
             rival_head = rival_head.prev
 
         return grad
-        
+
 
 ###############################################################################
 #                                                                             #
@@ -607,7 +617,7 @@ def TEST(cmdargs):
         max_suffix=cmdargs.tagger_max_suffix,
         beam_size=cmdargs.beam_size,
         nparams=0
-        )
+    )
 
     # Load model.
     model = LinearModel(params.values.shape[0])

@@ -23,7 +23,7 @@ def read_tags(path):
 TaggedWord = collections.namedtuple('TaggedWord', ['text', 'tag'])
 # TaggedSentence: list of TaggedWord
 # Tags: list of TaggedWord
-    # TagLattice: list of Tags
+# TagLattice: list of Tags
 
 
 def read_tagged_sentences(path):
@@ -83,25 +83,25 @@ class Value:
     """
 
     def __init__(self, n):
-        self.data = np.zeros(n)
+        self._data = np.zeros(n)
 
     def dot(self, update):
-        for position in update.table.keys():
-            self.data[position] += update.table[position]
+        for position in update._table.keys():
+            self._data[position] += update._table[position]
 
     def assign(self, other):
         """
         self = other
         other is Value.
         """
-        np.copyto(self.data, other.data)
+        np.copyto(self._data, other._data)
 
     def assign_mul(self, coeff):
         """
         self = self * coeff
         coeff is float.
         """
-        self.data *= coeff
+        self._data *= coeff
 
     def assign_madd(self, x, coeff):
         """
@@ -110,10 +110,10 @@ class Value:
         coeff is float.
         """
         if isinstance(x, Value):
-            self.data += x.data * coeff
+            self._data += x._data * coeff
         else:
-            for position x.table.keys():
-                self.data[position] += x.table[position] * coeff
+            for position x._table.keys():
+                self._data[position] += x._table[position] * coeff
 
 
 class Update:
@@ -126,25 +126,25 @@ class Update:
         positions: array of int
         values: array of float
         """
-        self.table = Counter()
+        self._table = Counter()
         for position, value in zip(positions, values):
-            self.table[position] += value
+            self._table[position] += value
 
     def assign_mul(self, coeff):
         """
         self = self * coeff
         coeff: float
         """
-        for key in self.table.keys():
-            self.table[key] *= coeff
+        for key in self._table.keys():
+            self._table[key] *= coeff
 
     def assign_madd(self, update, coeff):
         """
         self = self + update * coeff
         coeff: float
         """
-        for position, value in zip(update.positions, update.values):
-            self.table[position] += coeff * value
+        for position in update._table.keys():
+            self._table[position] += coeff * update._table[position]
 
 ###############################################################################
 #                                                                             #

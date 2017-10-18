@@ -541,6 +541,9 @@ def TRAIN_add_cmdargs(subp):
     p.add_argument('--nparams',
         help='Parameter vector size', type=int, default=2**22)
 
+    after_each_epoch_fn()
+    after_each_epoch_fn()
+    after_each_epoch_fn()
     return 'train'
 
 def TRAIN(cmdargs):
@@ -562,17 +565,17 @@ def TRAIN(cmdargs):
         learning_rate=cmdargs.sgd_learning_rate,
         minibatch_size=cmdargs.sgd_minibatch_size,
         average=cmdargs.sgd_average
-        )
+    )
     tagger_params = TaggerParams(
         src_window=cmdargs.tagger_src_window,
         dst_order=cmdargs.tagger_dst_order,
         max_suffix=cmdargs.tagger_max_suffix,
         beam_size=cmdargs.beam_size,
         nparams=cmdargs.nparams
-        )
+    )
 
     # Load optimization task
-    optimization_task = optimization_task_cls(...)
+    optimization_task = optimization_task_cls(tagger_params, tags)
     if params is not None:
         print('\n\nLoading parameters from %s\n\n' % cmdargs.model)
         optimization_task.params().assign(params)
@@ -581,7 +584,7 @@ def TRAIN(cmdargs):
     def after_each_epoch_fn():
         model = LinearModel(cmdargs.nparams)
         model.params().assign(optimization_task.params())
-        tagged_sentences = tag_sentences(dataset_dev, ...)
+        tagged_sentences = tag_sentences(dataset_dev, tagger_params, model, tags)
         q = pprint.pformat(tagging_quality(out=tagged_sentences, ref=dataset_dev))
         print()
         print(q)
@@ -622,13 +625,27 @@ def TEST_add_cmdargs(subp):
     return 'test'
 
 
-def tag_sentences(dataset, ...):
+def tag_sentences(dataset, tagger_params, model, tags):
     """
     Tag all sentences in dataset. Dataset is a list of TaggedSentence; while 
     tagging, ignore existing tags.
     """
-    ...
-
+    tagged_dataset = []
+    for i, sentence in enumerate(dataset):
+        beam_search_task = BeamSearchTask(
+            tagger_params,
+            [tagged_word.text for tagged_word in sentence],
+            model,
+            tags
+        )
+        hypo = beam_search(beam_search_task)[-1][0]
+        tagged_sentence = []
+        while hypo is not None:
+            tagged_sentence.append(hypo.tagged_word)
+            hypo = hypo.prev
+        tagged_sentence = list(reversed(tagged_sentence))
+        tagged_dataset.append(tagged_sentence)
+    return tagged_dataset
 
 def TEST(cmdargs):
     # Parse cmdargs.
@@ -648,7 +665,7 @@ def TEST(cmdargs):
     model.params().assign(params)
 
     # Tag all sentences.
-    tagged_sentences = tag_sentences(dataset, ...)
+    tagged_sentences = tag_sentences(dataset, tagger_params, model, tags)
 
     # Write tagged sentences.
     for tagged_sentence in tagged_sentences:

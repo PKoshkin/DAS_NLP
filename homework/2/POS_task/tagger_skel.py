@@ -435,11 +435,10 @@ class StructuredPerceptronOptimizationTask(OptimizationTask):
             golden_features = feature_computer.compute_features(golden_head)
             grad.assign_madd(self.model.gradient(golden_features, score=None), -1)
 
-
             golden_head = golden_head.prev
             rival_head = rival_head.prev
 
-        return grad
+        return None, grad
 
 
 ###############################################################################
@@ -454,14 +453,21 @@ SGDParams = namedtuple('SGDParams', [
     'learning_rate',
     'minibatch_size',
     'average' # bool or int
-    ])
+])
 
 
 def make_batches(dataset, minibatch_size):
     """
     Make list of batches from a list of examples.
     """
-    ...
+    if len(dataset) % minibatch_size == 0:
+        minibatches_number = int(len(dataset) / minibatch_size)
+    else:
+        minibatches_number = int(len(dataset) / minibatch_size) + 1
+    return [
+        dataset[(i * minibatch_size):((i + 1) * minibatch_size)]
+        for i in range(minibatches_number)
+    ]
 
 
 def sgd(sgd_params, optimization_task, dataset, after_each_epoch_fn):
@@ -472,7 +478,24 @@ def sgd(sgd_params, optimization_task, dataset, after_each_epoch_fn):
     After each epoch (and also before and after the whole training),
     run after_each_epoch_fn().
     """
-    ...
+    batches = make_batches(dataset, sgd_params.minibatch_size)
+    params_sum = Value(optimization_task.tagger_params.nparams)
+    sum_length = 0
+    after_each_epoch_fn()
+    for epoch in range(sgd_params.epochs):
+        for batch in batches:
+            grad = Update()
+            for example in batch:
+                None, new_grad = optimization_task.loss_and_gradient(example)
+                grad.assign_madd(new_grad, 1)
+            optimization_task.params().assign_madd(grad, sgd_params.learning_rate)
+        if epoch % sgd_params.average == 0:
+            params_sum.assign_madd(optimization_task.params(), 1)
+            sum_length += 1
+        after_each_epoch_fn()
+    after_each_epoch_fn()
+    params_sum.assign_mul(1 / sum_length)
+    optimization_task.params().assign(params_sum)
 
 
 ###############################################################################

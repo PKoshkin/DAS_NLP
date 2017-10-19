@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 
 import numpy as np
+from math import ceil
+from random import shuffle
 import cityhash
+import argparse
+import os
+import re
+import pprint
+import pickle
 from collections import Counter
 from collections import namedtuple
 
@@ -36,12 +43,14 @@ def read_tagged_sentences(path):
         tagged_senencies = [[]]
         for line in file:
             line = line.split()
+            if len(line) == 0:
+                continue
             if line[0].isdigit():
-                tag = line[3]
-                word = line[1]
-                tagged_senencies[-1].appned(TaggedWord(text=line[3], tag=line[1]))
+                tagged_senencies[-1].append(TaggedWord(text=line[1], tag=line[3]))
             else:
-                tagged_senencies.appned([])
+                if len(tagged_senencies) != 0:
+                    if len(tagged_senencies[-1]) != 0:
+                        tagged_senencies.append([])
         if len(tagged_senencies[-1]) == 0:
             tagged_senencies = tagged_senencies[:-1]
         return tagged_senencies
@@ -67,7 +76,7 @@ def tagging_quality(ref, out):
     ncorrect = 0
     import itertools
     for ref_sentence, out_sentence in itertools.zip_longest(ref, out):
-        for ref_word, out_word in itertools.zip_longest():
+        for ref_word, out_word in itertools.zip_longest(ref_sentence, out_sentence):
             nwords += 1
             if ref_word.tag == out_word.tag:
                 ncorrect += 1
@@ -87,11 +96,13 @@ class Value:
     """
 
     def __init__(self, n):
-        self._data = np.zeros(n)
+        self._data = np.ones(n)
 
     def dot(self, update):
+        result = 0
         for position in update._table.keys():
-            self._data[position] += update._table[position]
+            result += self._data[position] * update._table[position]
+        return result
 
     def assign(self, other):
         """
@@ -116,7 +127,7 @@ class Value:
         if isinstance(x, Value):
             self._data += x._data * coeff
         else:
-            for position x._table.keys():
+            for position in x._table.keys():
                 self._data[position] += x._table[position] * coeff
 
 
@@ -131,8 +142,9 @@ class Update:
         values: array of float
         """
         self._table = Counter()
-        for position, value in zip(positions, values):
-            self._table[position] += value
+        if positions is not None:
+            for position, value in zip(positions, values):
+                self._table[position] += value
 
     def assign_mul(self, coeff):
         """
@@ -227,29 +239,37 @@ class FeatureComputer:
         """
         Compute features for a given Hypo and return Update.
         """
-        features = []
+        # simple features
+        regulars = [re.compile(r'[A-Z]'), re.compile(r'[0-9]'), re.compile(r'-')]
+        features = [h((i, regular.search(hypo.tagged_word.text))) % self._tagger_params.nparams for i, regular in enumerate(regulars)]
+
         # neighboors words
-        for index in range(
-            max(hypo.pos - self._tagger_params.src_window, 0),
-            min(hypo.pos + self._tagger_params.src_window + 1, len(self._source_sentence))
-        ):
-            features.appned(h(hypo.tagged_word.tag,
+        min_index = max(hypo.pos - self._tagger_params.src_window, 0)
+        max_index = min(hypo.pos + self._tagger_params.src_window + 1, len(self._source_sentence))
+        for index in range(min_index, max_index):
+            features.append(h(('neighboor word ' + str(index), hypo.tagged_word.tag,
                 self._source_sentence[index]
-            ) % self._tagger_params.nparams)
+            )) % self._tagger_params.nparams)
 
         # previous tags
         tmp_hypo = hypo
         while tmp_hypo != None:
-            features.appned(h(hypo.tagged_word.tag,
+            features.append(h(('previous tag' + str(tmp_hypo.pos), hypo.tagged_word.tag,
                 tmp_hypo.tagged_word.tag
-            ) % self._tagger_params.nparams)
+            )) % self._tagger_params.nparams)
             tmp_hypo = tmp_hypo.prev
 
         # suffixes
         for i in range(1, self._tagger_params.max_suffix):
-            features.appned(h(hypo.tagged_word.tag,
-                hypo.tagged_word.word[-i:]
-            ) % self._tagger_params.nparams)
+            features.append(h(('suffixes' + str(i), hypo.tagged_word.tag,
+                hypo.tagged_word.text[-i:]
+            )) % self._tagger_params.nparams)
+
+        # prefixes
+        for i in range(1, self._tagger_params.max_suffix):
+            features.append(h(('prefixes' + str(i), hypo.tagged_word.tag,
+                hypo.tagged_word.text[:i]
+            )) % self._tagger_params.nparams)
 
         return Update(positions=features, values=np.ones(len(features)))
 
@@ -291,36 +311,26 @@ class BeamSearchTask:
 
         Compute hypotheses' scores inside this function!
         """
-        if hypo is None:
-            return [
-                Hypo(
-                    prev=None,
-                    pos=0,
-                    tagged_word=TaggedWord(text=self._source_sentence[0], tag=tag),
-                    score=0
-                )
-                for tag in tags
-            ]
-        else:
-            hypos = []
-            for tag in tags:
-                new_hypo = Hypo(
-                    prev=hypo,
-                    pos=(hypo.pos + 1),
-                    tagged_word=TaggedWord(text=self._source_sentence[hypo.pos + 1], tag=tag),
-                    score=0
-                )   
-                hypos.append(new_hypo._replace(
-                    score=self._model.score(self._feature_computer.compute_features(new_hypo))
-                ))
-            return hypos
+        hypos = []
+        position = (hypo.pos + 1) if hypo is not None else 0
+        for tag in self._tags:
+            new_hypo = Hypo(
+                prev=hypo,
+                pos=position,
+                tagged_word=TaggedWord(text=self._source_sentence[position], tag=tag),
+                score=0
+            )
+            hypos.append(new_hypo._replace(
+                score=self._model.score(self._feature_computer.compute_features(new_hypo)) + (hypo.score if hypo is not None else 0)
+            ))
+        return hypos
 
     def recombo_hash(self, hypo):
         """
         If two hypos have the same recombination hashes, they can be collapsed
         together, leaving only the hypothesis with a better score.
         """
-        return hypo.score
+        return None
 
 
 def beam_search(beam_search_task):
@@ -332,17 +342,17 @@ def beam_search(beam_search_task):
     hypos = sorted(
         beam_search_task.expand(None),
         key=(lambda hypo: hypo.score)
-    )[beam_search_task.beam_size():]
+    )[-beam_search_task.beam_size():]
     stacks = [hypos]
     for step in range(beam_search_task.total_num_steps() - 1):
         new_hypos = []
         for hypo in hypos:
-            new_hypos.expand(beam_search_task.expand(hypo))
+            new_hypos.extend(beam_search_task.expand(hypo))
         hypos = sorted(
-            new_hypos
+            new_hypos,
             key=(lambda hypo: hypo.score)
-        )[beam_search_task.beam_size():]
-        stacks.appned(hypos)
+        )[-beam_search_task.beam_size():]
+        stacks.append(hypos)
     return stacks
         
 
@@ -407,24 +417,24 @@ class StructuredPerceptronOptimizationTask(OptimizationTask):
 
         # Compute chain of golden hypos (and their scores!).
         golden_head = None
-        feature_computer = FeatureComputer(self.tagger_params, golden_sentence)
+        feature_computer = FeatureComputer(self.tagger_params, [tagged_word.text for tagged_word in golden_sentence])
         for i, word in enumerate(golden_sentence):
-            golden_head= Hypo(
+            golden_head = Hypo(
                 prev=golden_head,
                 pos=i,
                 tagged_word=word,
                 score=0
             )
-            golden_head._replace(self.model.score(
+            golden_head._replace(score=self.model.score(
                 feature_computer.compute_features(
                     golden_head
-                )
-            ))
-            if golden_head.score < stacks[i][tagger_params.beam_size - 1]:
-                rival_head = stacks[i][0]
+                )) + golden_head.score
+            )
+            if golden_head.score < stacks[i][0].score:
+                rival_head = stacks[i][-1]
                 break
         else:
-            rival_head = stacks[-1][0]
+            rival_head = stacks[-1][-1]
 
         # Compute gradient.
         grad = Update()
@@ -460,14 +470,13 @@ def make_batches(dataset, minibatch_size):
     """
     Make list of batches from a list of examples.
     """
-    if len(dataset) % minibatch_size == 0:
-        minibatches_number = int(len(dataset) / minibatch_size)
-    else:
-        minibatches_number = int(len(dataset) / minibatch_size) + 1
-    return [
+    minibatches_number = ceil(len(dataset) / minibatch_size)
+    result = [
         dataset[(i * minibatch_size):((i + 1) * minibatch_size)]
         for i in range(minibatches_number)
     ]
+    shuffle(result)
+    return result
 
 
 def sgd(sgd_params, optimization_task, dataset, after_each_epoch_fn):
@@ -483,19 +492,19 @@ def sgd(sgd_params, optimization_task, dataset, after_each_epoch_fn):
     sum_length = 0
     after_each_epoch_fn()
     for epoch in range(sgd_params.epochs):
-        for batch in batches:
+        for i, batch in enumerate(batches):
             grad = Update()
             for example in batch:
-                None, new_grad = optimization_task.loss_and_gradient(example)
+                new_grad = optimization_task.loss_and_gradient(example)[1]
                 grad.assign_madd(new_grad, 1)
-            optimization_task.params().assign_madd(grad, sgd_params.learning_rate)
-        if epoch % sgd_params.average == 0:
-            params_sum.assign_madd(optimization_task.params(), 1)
-            sum_length += 1
+            optimization_task.params().assign_madd(grad, -sgd_params.learning_rate)
+            if i % sgd_params.average == 0:
+                params_sum.assign_madd(optimization_task.params(), 1)
+                sum_length += 1
         after_each_epoch_fn()
-    after_each_epoch_fn()
     params_sum.assign_mul(1 / sum_length)
     optimization_task.params().assign(params_sum)
+    after_each_epoch_fn()
 
 
 ###############################################################################
@@ -537,13 +546,10 @@ def TRAIN_add_cmdargs(subp):
         help='Maximal number of prefix/suffix letters to use for features',
         type=int, default=4)
     p.add_argument('--beam-size',
-        help='Beam size (0 means unstructured)', type=int, default=1)
+        help='Beam size (0 means unstructured)', type=int, default=3)
     p.add_argument('--nparams',
         help='Parameter vector size', type=int, default=2**22)
 
-    after_each_epoch_fn()
-    after_each_epoch_fn()
-    after_each_epoch_fn()
     return 'train'
 
 def TRAIN(cmdargs):
@@ -638,7 +644,7 @@ def tag_sentences(dataset, tagger_params, model, tags):
             model,
             tags
         )
-        hypo = beam_search(beam_search_task)[-1][0]
+        hypo = beam_search(beam_search_task)[-1][-1]
         tagged_sentence = []
         while hypo is not None:
             tagged_sentence.append(hypo.tagged_word)

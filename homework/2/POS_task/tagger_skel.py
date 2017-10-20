@@ -273,7 +273,6 @@ class FeatureComputer:
 
         return Update(positions=features, values=np.ones(len(features)))
 
-
 ###############################################################################
 #                                                                             #
 #                                BEAM SEARCH                                  #
@@ -416,25 +415,31 @@ class StructuredPerceptronOptimizationTask(OptimizationTask):
         stacks = beam_search(beam_search_task)
 
         # Compute chain of golden hypos (and their scores!).
-        golden_head = None
+        golden_hypo = None
         feature_computer = FeatureComputer(self.tagger_params, [tagged_word.text for tagged_word in golden_sentence])
+        max_violation = 0
         for i, word in enumerate(golden_sentence):
-            golden_head = Hypo(
-                prev=golden_head,
+            new_golden_hypo = Hypo(
+                prev=golden_hypo,
                 pos=i,
                 tagged_word=word,
                 score=0
             )
-            golden_head._replace(score=self.model.score(
+            golden_hypo = new_golden_hypo._replace(score=self.model.score(
                 feature_computer.compute_features(
-                    golden_head
-                )) + golden_head.score
+                    new_golden_hypo
+                )) + (golden_hypo.score if golden_hypo is not None else 0)
             )
-            if golden_head.score < stacks[i][0].score:
+            new_violation = stacks[i][0].score - golden_hypo.score
+            if new_violation > max_violation:
+                golden_head = golden_hypo
                 rival_head = stacks[i][-1]
-                break
-        else:
+                max_violation = new_violation
+
+        if max_violation == 0:
             rival_head = stacks[-1][-1]
+            golden_head = golden_hypo
+
 
         # Compute gradient.
         grad = Update()
@@ -449,7 +454,6 @@ class StructuredPerceptronOptimizationTask(OptimizationTask):
             rival_head = rival_head.prev
 
         return None, grad
-
 
 ###############################################################################
 #                                                                             #
@@ -506,7 +510,6 @@ def sgd(sgd_params, optimization_task, dataset, after_each_epoch_fn):
     optimization_task.params().assign(params_sum)
     after_each_epoch_fn()
 
-
 ###############################################################################
 #                                                                             #
 #                                    MAIN                                     #
@@ -546,7 +549,7 @@ def TRAIN_add_cmdargs(subp):
         help='Maximal number of prefix/suffix letters to use for features',
         type=int, default=4)
     p.add_argument('--beam-size',
-        help='Beam size (0 means unstructured)', type=int, default=3)
+        help='Beam size (0 means unstructured)', type=int, default=5)
     p.add_argument('--nparams',
         help='Parameter vector size', type=int, default=2**22)
 

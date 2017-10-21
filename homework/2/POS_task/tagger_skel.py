@@ -6,6 +6,7 @@ from random import shuffle
 import cityhash
 import argparse
 import os
+import sys
 import re
 import pprint
 import pickle
@@ -59,10 +60,8 @@ def write_tagged_sentence(tagged_sentence, f):
     """
     Write tagged sentence to file-like object f.
     """
-    file = f.open()
-    for tagged_word in tagged_senencies:
-        file.write(tagged_word.text + ' ' + tagged_word.tag + '\n')
-    file.close()
+    for i, tagged_word in enumerate(tagged_sentence):
+        f.write(str(i + 1) + '\t' + tagged_word.text + '\t\t' + tagged_word.tag + '\n')
 
 
 TaggingQuality = namedtuple('TaggingQuality', ['acc'])
@@ -235,41 +234,57 @@ class FeatureComputer:
         self._tagger_params = tagger_params
         self._source_sentence = source_sentence
 
+
     def compute_features(self, hypo):
         """
         Compute features for a given Hypo and return Update.
         """
-        # simple features
+        def make_feature(feature, feature_name):
+            return h((feature_name, hypo.tagged_word.tag, feature)) % self._tagger_params.nparams 
         regulars = [re.compile(r'[A-Z]'), re.compile(r'[0-9]'), re.compile(r'-')]
-        features = [h((i, regular.search(hypo.tagged_word.text))) % self._tagger_params.nparams for i, regular in enumerate(regulars)]
+        features = [
+            make_feature((regular.search(hypo.tagged_word.text) is None), i)
+            for i, regular in enumerate(regulars)
+        ]
+        feature_counter = len(features)
 
         # neighboors words
         min_index = max(hypo.pos - self._tagger_params.src_window, 0)
         max_index = min(hypo.pos + self._tagger_params.src_window + 1, len(self._source_sentence))
         for index in range(min_index, max_index):
-            features.append(h(('neighboor word ' + str(index), hypo.tagged_word.tag,
-                self._source_sentence[index]
-            )) % self._tagger_params.nparams)
+            features.append(
+                make_feature(self._source_sentence[index], feature_counter)
+            )
+            feature_counter += 1
 
         # previous tags
         tmp_hypo = hypo
+        tags = tuple()
+        counter = 0
         while tmp_hypo != None:
-            features.append(h(('previous tag' + str(tmp_hypo.pos), hypo.tagged_word.tag,
-                tmp_hypo.tagged_word.tag
-            )) % self._tagger_params.nparams)
+            tags += (tmp_hypo.tagged_word.tag, )
+            features.append(
+                make_feature(tags, feature_counter)
+            )
+            feature_counter += 1
             tmp_hypo = tmp_hypo.prev
+            counter += 1
+            if counter > self._tagger_params.dst_order:
+                break
 
         # suffixes
-        for i in range(1, self._tagger_params.max_suffix):
-            features.append(h(('suffixes' + str(i), hypo.tagged_word.tag,
-                hypo.tagged_word.text[-i:]
-            )) % self._tagger_params.nparams)
+        for i in range(1, self._tagger_params.max_suffix + 1):
+            features.append(
+                make_feature(hypo.tagged_word.text[-i:], feature_counter)
+            )
+            feature_counter += 1
 
         # prefixes
-        for i in range(1, self._tagger_params.max_suffix):
-            features.append(h(('prefixes' + str(i), hypo.tagged_word.tag,
-                hypo.tagged_word.text[:i]
-            )) % self._tagger_params.nparams)
+        for i in range(1, self._tagger_params.max_suffix + 1):
+            features.append(
+                make_feature(hypo.tagged_word.text[:i], feature_counter)
+            )
+            feature_counter += 1
 
         return Update(positions=features, values=np.ones(len(features)))
 
@@ -629,7 +644,7 @@ def TEST_add_cmdargs(subp):
         help='Maximal number of prefix/suffix letters to use for features',
         type=int, default=4)
     p.add_argument('--beam-size',
-        help='Beam size', type=int, default=1)
+        help='Beam size', type=int, default=5)
 
     return 'test'
 
@@ -666,11 +681,11 @@ def TEST(cmdargs):
         dst_order=cmdargs.tagger_dst_order,
         max_suffix=cmdargs.tagger_max_suffix,
         beam_size=cmdargs.beam_size,
-        nparams=0
+        nparams=len(params._data)
     )
 
     # Load model.
-    model = LinearModel(params.values.shape[0])
+    model = LinearModel(np.shape(params._data))
     model.params().assign(params)
 
     # Tag all sentences.

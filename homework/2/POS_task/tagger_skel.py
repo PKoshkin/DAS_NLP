@@ -335,7 +335,8 @@ class BeamSearchTask:
                 score=0
             )
             hypos.append(new_hypo._replace(
-                score=self._model.score(self._feature_computer.compute_features(new_hypo)) + (hypo.score if hypo is not None else 0)
+                score=self._model.score(self._feature_computer.compute_features(new_hypo)) +
+                (hypo.score if hypo is not None else 0)
             ))
         return hypos
 
@@ -431,7 +432,10 @@ class StructuredPerceptronOptimizationTask(OptimizationTask):
 
         # Compute chain of golden hypos (and their scores!).
         golden_hypo = None
-        feature_computer = FeatureComputer(self.tagger_params, [tagged_word.text for tagged_word in golden_sentence])
+        feature_computer = FeatureComputer(
+            self.tagger_params,
+            [tagged_word.text for tagged_word in golden_sentence]
+        )
         max_violation = 0
         for i, word in enumerate(golden_sentence):
             new_golden_hypo = Hypo(

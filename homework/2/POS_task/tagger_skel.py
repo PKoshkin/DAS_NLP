@@ -61,7 +61,8 @@ def write_tagged_sentence(tagged_sentence, f):
     Write tagged sentence to file-like object f.
     """
     for i, tagged_word in enumerate(tagged_sentence):
-        f.write(str(i + 1) + '\t' + tagged_word.text + '\t\t' + tagged_word.tag + '\n')
+        f.write(str(i + 1) + '\t' + tagged_word.text + '\t\t' + tagged_word.tag + '\t\t\t\t\t\t\n')
+    print('\n')
 
 
 TaggingQuality = namedtuple('TaggingQuality', ['acc'])
@@ -635,7 +636,7 @@ def TEST_add_cmdargs(subp):
     p.add_argument('--tags',
         help='tags file', type=str, default='data/tags')
     p.add_argument('--dataset',
-        help='test dataset', default='data/en-ud-dev.conllu')
+        help='test dataset', default='data/en-ud-test-notags.conllu')
     p.add_argument('--model',
         help='NPZ model', type=str, default='model.npz')
     p.add_argument('--tagger-src-window',

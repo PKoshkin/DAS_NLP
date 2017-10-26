@@ -569,7 +569,7 @@ def TRAIN_add_cmdargs(subp):
         help='Maximal number of prefix/suffix letters to use for features',
         type=int, default=4)
     p.add_argument('--beam-size',
-        help='Beam size (0 means unstructured)', type=int, default=5)
+        help='Beam size (0 means unstructured)', type=int, default=4)
     p.add_argument('--nparams',
         help='Parameter vector size', type=int, default=2**22)
 
@@ -649,7 +649,7 @@ def TEST_add_cmdargs(subp):
         help='Maximal number of prefix/suffix letters to use for features',
         type=int, default=4)
     p.add_argument('--beam-size',
-        help='Beam size', type=int, default=5)
+        help='Beam size', type=int, default=4)
 
     return 'test'
 

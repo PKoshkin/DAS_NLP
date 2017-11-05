@@ -95,16 +95,30 @@ class TransitionModel:
 
     def __init__(self, src_corpus, trg_corpus):
         "Add counters and parameters here for modeling alignment transitions."
-        pass
+        self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))
+        self._probs = defaultdict(lambda : defaultdict(lambda : 1.0))
 
     def get_parameters_for_sentence_pair(self, src_length):
         "Retrieve the parameters for this sentence pair: A[k, i] = p(a_{j} = i|a_{j-1} = k)"
-        pass
+        return np.array([[
+                self._probs[(src_length, k)][i]
+                for i in range(src_length)
+            ] for k in range(src_length)
+        ])
 
     def collect_statistics(self, src_length, transition_posteriors):
         "Accumulate statistics from transition_posteriors[k][i]: p(a_{j} = i, a_{j-1} = k|e, f)"
-        pass
+        for k in transition_posteriors.keys():
+            for i in transition_posteriors[(src_length, k)].keys():
+                self._counts[(src_length, k)][i] += transition_posteriors[k][i]
+
 
     def recompute_parameters(self):
         "Reestimate the parameters and reset counters."
-        pass
+        for key in transition_posteriors.keys():
+            denominamor = np.sum(list(transition_posteriors[key].values()))
+            for i in transition_posteriors[key].keys():
+                prob = self._counts[key][i]
+                self._probs[(src_length, k)][i] = prob
+
+        self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))

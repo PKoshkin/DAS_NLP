@@ -58,11 +58,12 @@ class PriorModel:
 
     def __init__(self, src_corpus, trg_corpus):
         "Add counters and parameters here for a prior model."
-        pass
+        self._probs = defaultdict(lambda : defaultdict(lambda : 1.0))
+        self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))
 
     def get_prior_prob(self, src_index, trg_index, src_length, trg_length):
         "Returns a prior probability based on src and trg indices."
-        return 1.0 / src_length # Currently Uniform prior.
+        return self._probs[(src_length, trg_length, trg_index)][src_index]
     
     def get_parameters_for_sentence_pair(self, src_length, trg_length):
         "Return a numpy array with all prior p[i][j] = p(i|j, I, J)."
@@ -74,11 +75,19 @@ class PriorModel:
 
     def collect_statistics(self, src_length, trg_length, posterior_matrix):
         "Accumulate counts of alignment events from posterior_matrix[j][i] = p(a_j=i|e, f)"
-        pass
+        for i in range(src_length):
+            for j in range(trg_length):
+                self._counts[(src_length, trg_length, j)] += posterior_matrix[i][j]
 
     def recompute_parameters(self):
         "Reestimate parameters and reset counters."
-        pass
+        for count_key in self._counts.keys():
+            denominamor = np.sum(list(self._counts[src_token].values()))
+            for i in self._counts[count_key].keys():
+                prob = self._counts[count_key][i] / denominamor
+                self._probs[count_key][i] = prob
+
+        self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))
 
 
 class TransitionModel:

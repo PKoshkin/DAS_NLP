@@ -63,12 +63,10 @@ def initialize_models(src_corpus, trg_corpus):
 
 def normalize(src_corpus, trg_corpus):
     lemmatizer = WordNetLemmatizer()
-    for sentence in trg_corpus:
-        for i, word in enumerate(sentence):
-            sentence[i] = lemmatizer.lemmatize(word.lower())
-    for sentence in src_corpus:
-        for i, word in enumerate(sentence):
-            sentence[i] = lemmatizer.lemmatize(word.lower())
+    for corpus in [trg_corpus, src_corpus]:
+        for sentence in corpus:
+            for i, word in enumerate(sentence):
+                sentence[i] = lemmatizer.lemmatize(word.lower())
     return src_corpus, trg_corpus
 
 if __name__ == "__main__":

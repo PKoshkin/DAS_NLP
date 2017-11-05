@@ -30,16 +30,27 @@ class TranslationModel:
 
     def get_parameters_for_sentence_pair(self, src_tokens, trg_tokens):
         "Return numpy array with t[i][j] = p(f_j|e_i)."
-        return np.array([[self.get_conditional_prob(src_token, trg_token)
-                          for trg_token in trg_tokens] for src_token in src_tokens])
+        return np.array([[
+                self.get_conditional_prob(src_token, trg_token)
+                for trg_token in trg_tokens
+            ] for src_token in src_tokens
+        ])
 
     def collect_statistics(self, src_tokens, trg_tokens, posterior_matrix):
         "Accumulate counts of translations from posterior_matrix[j][i] = p(a_j=i|e, f)"
-        assert False, "Store fractional counts from posterior matrix here."
+        for i, src_token in enumerate(src_tokens):
+            for j, trg_token in enumerate(trg_tokens):
+                self._src_trg_counts[src_token][trg_token] += posterior_matrix[i][j]
 
     def recompute_parameters(self):
         "Reestimate parameters and reset counters."
-        assert False, "Normalize to recompute parameters from counts."
+        for src_token in self._src_trg_counts.keys():
+            denominamor = np.sum(list(self._src_trg_counts[src_token].values()))
+            for trg_token in self._src_trg_counts[src_token].keys():
+                prob = self._src_trg_counts[src_token][trg_token] / denominamor
+                self._trg_given_src_probs[src_token][trg_token] = prob
+
+        self._src_trg_counts = defaultdict(lambda : defaultdict(lambda : 0.0))
 
 
 class PriorModel:
@@ -55,8 +66,11 @@ class PriorModel:
     
     def get_parameters_for_sentence_pair(self, src_length, trg_length):
         "Return a numpy array with all prior p[i][j] = p(i|j, I, J)."
-        return np.array([[self.get_prior_prob(i, j, src_length, trg_length)
-                          for j in range(trg_length)] for i in range(src_length)])
+        return np.array([[
+                self.get_prior_prob(i, j, src_length, trg_length)
+                for j in range(trg_length)
+            ] for i in range(src_length)
+        ])
 
     def collect_statistics(self, src_length, trg_length, posterior_matrix):
         "Accumulate counts of alignment events from posterior_matrix[j][i] = p(a_j=i|e, f)"

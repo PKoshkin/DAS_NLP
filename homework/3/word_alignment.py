@@ -8,8 +8,18 @@ from utils import read_all_tokens, output_alignments_per_test_set
 def get_alignment_posteriors(src_tokens, trg_tokens, prior_model, translation_model):
     "Compute the posterior alignment probability p(a_j=i | f, e) for each target token f_j."
     alignment_posteriors = np.zeros((len(trg_tokens), len(src_tokens)))
-    log_likelihood = 0.0
-    assert False, "Infer the posterior over alignments for this sentence pair."
+    p_prob = prior_model.get_parameters_for_sentence_pair(len(src_tokens), len(trg_tokens))
+    t_prob = translation_model.get_parameters_for_sentence_pair(src_tokens, trg_tokens)
+    alignment_posteriors += p_prob * t_prob
+    alignment_posteriors /= np.sum(p_prob * t_prob, axis=0)
+
+    answers = np.argmax(alignment_posteriors, axis=0)
+    arange = np.arange(len(trg_tokens))
+    log_likelihood = (
+        np.sum(np.log(prior[answers, arange])) +
+        np.sum(np.log(traslation[answers, arange]))
+    )
+
     return alignment_posteriors, log_likelihood
 
 def collect_expected_statistics(src_corpus, trg_corpus, prior_model, translation_model):
@@ -41,8 +51,8 @@ def align_corpus(src_corpus, trg_corpus, prior_model, translation_model):
     "Align each sentence pair in the corpus in turn."
     alignments = []
     for src_tokens, trg_tokens in zip(src_corpus, trg_corpus):
-        posteriors, _ = get_alignment_posteriors(src_tokens, trg_tokens, prior_model, translation_model)
-        alignments.append(np.argmax(posteriors, 1))
+        posteriors = get_alignment_posteriors(src_tokens, trg_tokens, prior_model, translation_model)[0]
+        alignments.append(np.argmax(posteriors, axis=0))
     return alignments
 
 def initialize_models(src_corpus, trg_corpus):
@@ -55,7 +65,7 @@ def normalize(src_corpus, trg_corpus):
     return src_corpus, trg_corpus
 
 if __name__ == "__main__":
-    if not len(sys.argv) == 5:
+    if len(sys.argv) != 5:
         print("Usage ./word_alignment.py src_corpus trg_corpus iterations output_prefix.")
         sys.exit(0)
     src_corpus, trg_corpus = read_all_tokens(sys.argv[1]), read_all_tokens(sys.argv[2])

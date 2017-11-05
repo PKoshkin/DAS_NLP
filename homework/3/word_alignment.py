@@ -4,6 +4,7 @@ from models import PriorModel # <-- Implemented as a uniform distribution.
 from models import TranslationModel # <-- Not implemented 
 from models import TransitionModel # <-- You will need this for an HMM.
 from utils import read_all_tokens, output_alignments_per_test_set
+from nltk.stem import WordNetLemmatizer
 
 def get_alignment_posteriors(src_tokens, trg_tokens, prior_model, translation_model):
     "Compute the posterior alignment probability p(a_j=i | f, e) for each target token f_j."
@@ -61,7 +62,13 @@ def initialize_models(src_corpus, trg_corpus):
     return prior_model, translation_model
 
 def normalize(src_corpus, trg_corpus):
-    assert False, "Normalize the corpus. Otherwise you'll have too many translation parameters!"
+    lemmatizer = WordNetLemmatizer()
+    for sentence in trg_corpus:
+        for i, word in enumerate(sentence):
+            sentence[i] = lemmatizer.lemmatize(word.lower())
+    for sentence in src_corpus:
+        for i, word in enumerate(sentence):
+            sentence[i] = lemmatizer.lemmatize(word.lower())
     return src_corpus, trg_corpus
 
 if __name__ == "__main__":

@@ -77,12 +77,12 @@ class PriorModel:
         "Accumulate counts of alignment events from posterior_matrix[j][i] = p(a_j=i|e, f)"
         for i in range(src_length):
             for j in range(trg_length):
-                self._counts[(src_length, trg_length, j)] += posterior_matrix[i][j]
+                self._counts[(src_length, trg_length, j)][i] += posterior_matrix[i][j]
 
     def recompute_parameters(self):
         "Reestimate parameters and reset counters."
         for count_key in self._counts.keys():
-            denominamor = np.sum(list(self._counts[src_token].values()))
+            denominamor = np.sum(list(self._counts[count_key].values()))
             for i in self._counts[count_key].keys():
                 prob = self._counts[count_key][i] / denominamor
                 self._probs[count_key][i] = prob

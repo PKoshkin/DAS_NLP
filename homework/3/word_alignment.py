@@ -8,7 +8,7 @@ from nltk.stem import WordNetLemmatizer
 
 def get_alignment_posteriors(src_tokens, trg_tokens, prior_model, translation_model):
     "Compute the posterior alignment probability p(a_j=i | f, e) for each target token f_j."
-    alignment_posteriors = np.zeros((len(trg_tokens), len(src_tokens)))
+    alignment_posteriors = np.zeros((len(src_tokens), len(trg_tokens)))
     p_prob = prior_model.get_parameters_for_sentence_pair(len(src_tokens), len(trg_tokens))
     t_prob = translation_model.get_parameters_for_sentence_pair(src_tokens, trg_tokens)
     alignment_posteriors += p_prob * t_prob
@@ -17,8 +17,8 @@ def get_alignment_posteriors(src_tokens, trg_tokens, prior_model, translation_mo
     answers = np.argmax(alignment_posteriors, axis=0)
     arange = np.arange(len(trg_tokens))
     log_likelihood = (
-        np.sum(np.log(prior[answers, arange])) +
-        np.sum(np.log(traslation[answers, arange]))
+        np.sum(np.log(p_prob[answers, arange])) +
+        np.sum(np.log(t_prob[answers, arange]))
     )
 
     return alignment_posteriors, log_likelihood

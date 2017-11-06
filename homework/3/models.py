@@ -23,6 +23,11 @@ class TranslationModel:
     def __init__(self, src_corpus, trg_corpus):
         self._trg_given_src_probs = defaultdict(lambda : defaultdict(lambda : 1.0))
         self._src_trg_counts = defaultdict(lambda : defaultdict(lambda : 0.0))
+        for src_sent, trg_sent in zip(src_corpus, trg_corpus):
+            for src_word in src_sent:
+                for trg_word in trg_sent:
+                    self._src_trg_counts[src_word][trg_word] += 1
+        self.recompute_parameters()
 
     def get_conditional_prob(self, src_token, trg_token):
         "Return the conditional probability of trg_token given src_token."
@@ -96,29 +101,16 @@ class TransitionModel:
 
     def __init__(self, src_corpus, trg_corpus):
         "Add counters and parameters here for modeling alignment transitions."
-        self._probs = defaultdict(lambda : defaultdict(lambda : 1.0))
-        self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))
+        pass
 
     def get_parameters_for_sentence_pair(self, src_length):
         "Retrieve the parameters for this sentence pair: A[k, i] = p(a_{j} = i|a_{j-1} = k)"
-        return np.array([[
-                self._probs[(src_length, k)][i]
-                for i in range(src_length)
-            ] for k in range(src_length)
-        ])
+        pass
 
     def collect_statistics(self, src_length, transition_posteriors):
         "Accumulate statistics from transition_posteriors[k][i]: p(a_{j} = i, a_{j-1} = k|e, f)"
-        for i in range(src_length):
-            for k in range(src_length):
-                self._counts[(src_length, k)][i] += transition_posteriors[k][i]
+        pass
 
     def recompute_parameters(self):
         "Reestimate the parameters and reset counters."
-        for key in self._counts.keys():
-            denominator = np.sum(list(self._counts[key].values()))
-            for src_index in self._counts[key].keys():
-                if denominator != 0:
-                    prob = self._counts[key][src_index] / denominator
-                    self._probs[key][src_index] = prob
-        self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))
+        pass

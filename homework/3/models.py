@@ -40,7 +40,7 @@ class TranslationModel:
         "Accumulate counts of translations from posterior_matrix[j][i] = p(a_j=i|e, f)"
         for i, src_token in enumerate(src_tokens):
             for j, trg_token in enumerate(trg_tokens):
-                self._src_trg_counts[src_token][trg_token] += posterior_matrix[i][j]
+                self._src_trg_counts[src_token][trg_token] += posterior_matrix[j][i]
 
     def recompute_parameters(self):
         "Reestimate parameters and reset counters."
@@ -69,15 +69,15 @@ class PriorModel:
         "Return a numpy array with all prior p[i][j] = p(i|j, I, J)."
         return np.array([[
                 self.get_prior_prob(i, j, src_length, trg_length)
-                for j in range(trg_length)
-            ] for i in range(src_length)
+                for i in range(src_length)
+            ] for j in range(trg_length)
         ])
 
     def collect_statistics(self, src_length, trg_length, posterior_matrix):
         "Accumulate counts of alignment events from posterior_matrix[j][i] = p(a_j=i|e, f)"
-        for i in range(src_length):
-            for j in range(trg_length):
-                self._counts[(src_length, trg_length, j)][i] += posterior_matrix[i][j]
+        for j in range(trg_length):
+            for i in range(src_length):
+                self._counts[(src_length, trg_length, j)][i] += posterior_matrix[j][i]
 
     def recompute_parameters(self):
         "Reestimate parameters and reset counters."
@@ -108,17 +108,17 @@ class TransitionModel:
 
     def collect_statistics(self, src_length, transition_posteriors):
         "Accumulate statistics from transition_posteriors[k][i]: p(a_{j} = i, a_{j-1} = k|e, f)"
-        for k in transition_posteriors.keys():
-            for i in transition_posteriors[(src_length, k)].keys():
+        for k in range(src_length):
+            for i in range(src_length):
                 self._counts[(src_length, k)][i] += transition_posteriors[k][i]
 
 
     def recompute_parameters(self):
         "Reestimate the parameters and reset counters."
-        for key in transition_posteriors.keys():
-            denominamor = np.sum(list(transition_posteriors[key].values()))
-            for i in transition_posteriors[key].keys():
+        for key in self._counts.keys():
+            denominamor = np.sum(list(self._counts[key].values()))
+            for i in self._counts[key].keys():
                 prob = self._counts[key][i]
-                self._probs[(src_length, k)][i] = prob
+                self._probs[key][i] = prob
 
         self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))

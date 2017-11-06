@@ -22,6 +22,7 @@ def get_alignment_posteriors(src_tokens, trg_tokens, prior_model, translation_mo
     log_likelihood = np.sum(np.log(answers_probs))
     return alignment_posteriors, log_likelihood, answers
 
+
 def collect_expected_statistics(src_corpus, trg_corpus, prior_model, translation_model):
     "E-step: infer posterior distribution over each sentence pair and collect statistics."
     corpus_log_likelihood = 0.0
@@ -35,6 +36,7 @@ def collect_expected_statistics(src_corpus, trg_corpus, prior_model, translation
         corpus_log_likelihood += log_likelihood
     return corpus_log_likelihood
 
+
 def estimate_models(src_corpus, trg_corpus, prior_model, translation_model, num_iterations):
     "Estimate models iteratively."
     for iteration in range(num_iterations):
@@ -47,6 +49,7 @@ def estimate_models(src_corpus, trg_corpus, prior_model, translation_model, num_
             print("corpus log likelihood: %1.3f" % corpus_log_likelihood)
     return prior_model, translation_model
 
+
 def align_corpus(src_corpus, trg_corpus, prior_model, translation_model):
     "Align each sentence pair in the corpus in turn."
     alignments = []
@@ -55,25 +58,31 @@ def align_corpus(src_corpus, trg_corpus, prior_model, translation_model):
         alignments.append(answers)
     return alignments
 
+
 def initialize_models(src_corpus, trg_corpus):
     prior_model = PriorModel(src_corpus, trg_corpus)
     translation_model = TranslationModel(src_corpus, trg_corpus)
     return prior_model, translation_model
 
-def normalize(src_corpus, trg_corpus):
+
+def normalize(corpus, lemmatize=True):
     lemmatizer = WordNetLemmatizer()
-    for corpus in [trg_corpus, src_corpus]:
-        for sentence in corpus:
-            for i, word in enumerate(sentence):
-                sentence[i] = lemmatizer.lemmatize(word.lower())
-    return src_corpus, trg_corpus
+    for sentence in corpus:
+        for i, word in enumerate(sentence):
+            word = word.lower()
+            if lemmatize:
+                word = lemmatizer.lemmatize(word)
+            sentence[i] = word[:5]
+    return corpus
+
 
 if __name__ == "__main__":
     if not len(sys.argv) == 5:
         print("Usage ./word_alignment.py src_corpus trg_corpus iterations output_prefix.")
         sys.exit(0)
     src_corpus, trg_corpus = read_all_tokens(sys.argv[1]), read_all_tokens(sys.argv[2])
-    src_corpus, trg_corpus = normalize(src_corpus, trg_corpus)
+    src_corpus = normalize(src_corpus)
+    trg_corpus = normalize(trg_corpus, sys.argv[2].find('lemmas') == -1)
     num_iterations = int(sys.argv[3])
     output_prefix = sys.argv[4]
     assert len(src_corpus) == len(trg_corpus), "Corpora should be same size!"

@@ -60,9 +60,12 @@ class PriorModel:
         self._probs = defaultdict(lambda : defaultdict(lambda : 1.0))
         self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))
 
+    def _get_key(self, src_index, trg_index, src_length, trg_length):
+        return (src_length - trg_length, trg_index)
+
     def get_prior_prob(self, src_index, trg_index, src_length, trg_length):
         "Returns a prior probability based on src and trg indices."
-        return self._probs[(src_length, trg_length, trg_index)][src_index]
+        return self._probs[self._get_key(src_index, trg_index, src_length, trg_length)][src_index]
     
     def get_parameters_for_sentence_pair(self, src_length, trg_length):
         "Return a numpy array with all prior p[i][j] = p(i|j, I, J)."
@@ -76,7 +79,7 @@ class PriorModel:
         "Accumulate counts of alignment events from posterior_matrix[j][i] = p(a_j=i|e, f)"
         for i in range(src_length):
             for j in range(trg_length):
-                self._counts[(src_length, trg_length, j)][i] += posterior_matrix[j][i]
+                self._counts[self._get_key(i, j, src_length, trg_length)][i] += posterior_matrix[j][i]
 
     def recompute_parameters(self):
         "Reestimate parameters and reset counters."

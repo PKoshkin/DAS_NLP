@@ -118,6 +118,7 @@ class TransitionModel:
         for key in self._counts.keys():
             denominator = np.sum(list(self._counts[key].values()))
             for src_index in self._counts[key].keys():
-                prob = self._counts[key][src_index] / denominator
-                self._probs[key][src_index] = prob
+                if denominator != 0:
+                    prob = self._counts[key][src_index] / denominator
+                    self._probs[key][src_index] = prob
         self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))

@@ -45,11 +45,10 @@ class TranslationModel:
     def recompute_parameters(self):
         "Reestimate parameters and reset counters."
         for src_token in self._src_trg_counts.keys():
-            denominamor = np.sum(list(self._src_trg_counts[src_token].values()))
+            denominator = np.sum(list(self._src_trg_counts[src_token].values()))
             for trg_token in self._src_trg_counts[src_token].keys():
-                prob = self._src_trg_counts[src_token][trg_token] / denominamor
+                prob = self._src_trg_counts[src_token][trg_token] / denominator
                 self._trg_given_src_probs[src_token][trg_token] = prob
-
         self._src_trg_counts = defaultdict(lambda : defaultdict(lambda : 0.0))
 
 
@@ -69,24 +68,23 @@ class PriorModel:
         "Return a numpy array with all prior p[i][j] = p(i|j, I, J)."
         return np.array([[
                 self.get_prior_prob(i, j, src_length, trg_length)
-                for i in range(src_length)
-            ] for j in range(trg_length)
+                for j in range(trg_length)
+            ] for i in range(src_length)
         ])
 
     def collect_statistics(self, src_length, trg_length, posterior_matrix):
         "Accumulate counts of alignment events from posterior_matrix[j][i] = p(a_j=i|e, f)"
-        for j in range(trg_length):
-            for i in range(src_length):
+        for i in range(src_length):
+            for j in range(trg_length):
                 self._counts[(src_length, trg_length, j)][i] += posterior_matrix[j][i]
 
     def recompute_parameters(self):
         "Reestimate parameters and reset counters."
-        for count_key in self._counts.keys():
-            denominamor = np.sum(list(self._counts[count_key].values()))
-            for i in self._counts[count_key].keys():
-                prob = self._counts[count_key][i] / denominamor
-                self._probs[count_key][i] = prob
-
+        for key in self._counts.keys():
+            denominator = np.sum(list(self._counts[key].values()))
+            for src_index in self._counts[key].keys():
+                prob = self._counts[key][src_index] / denominator
+                self._probs[key][src_index] = prob
         self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))
 
 
@@ -95,30 +93,16 @@ class TransitionModel:
 
     def __init__(self, src_corpus, trg_corpus):
         "Add counters and parameters here for modeling alignment transitions."
-        self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))
-        self._probs = defaultdict(lambda : defaultdict(lambda : 1.0))
+        pass
 
     def get_parameters_for_sentence_pair(self, src_length):
         "Retrieve the parameters for this sentence pair: A[k, i] = p(a_{j} = i|a_{j-1} = k)"
-        return np.array([[
-                self._probs[(src_length, k)][i]
-                for i in range(src_length)
-            ] for k in range(src_length)
-        ])
+        pass
 
     def collect_statistics(self, src_length, transition_posteriors):
         "Accumulate statistics from transition_posteriors[k][i]: p(a_{j} = i, a_{j-1} = k|e, f)"
-        for k in range(src_length):
-            for i in range(src_length):
-                self._counts[(src_length, k)][i] += transition_posteriors[k][i]
-
+        pass
 
     def recompute_parameters(self):
         "Reestimate the parameters and reset counters."
-        for key in self._counts.keys():
-            denominamor = np.sum(list(self._counts[key].values()))
-            for i in self._counts[key].keys():
-                prob = self._counts[key][i]
-                self._probs[key][i] = prob
-
-        self._counts = defaultdict(lambda : defaultdict(lambda : 0.0))
+        pass

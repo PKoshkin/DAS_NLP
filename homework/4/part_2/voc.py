@@ -7,7 +7,7 @@ class Vocab:
         """
         assert bos in tokens, eos in tokens
         self.tokens = tokens
-        self.token_to_ix = {t:i for i,t in enumerate(tokens)}
+        self.token_to_ix = {t: i for i, t in enumerate(tokens)}
 
         self.bos = bos
         self.bos_ix = self.token_to_ix[bos]
@@ -23,21 +23,20 @@ class Vocab:
         flat_lines = sep.join(list(lines))
         flat_lines = list(flat_lines.split(sep)) if sep != '' else list(flat_lines)
         tokens = list(set(sep.join(flat_lines)))
-        tokens = [t for t in tokens if t not in (bos,eos) and len(t) != 0]
-        tokens = [bos,eos] + tokens
-        return Vocab(tokens,bos,eos,sep)
+        tokens = [t for t in tokens if t not in (bos, eos) and len(t) != 0]
+        tokens = [bos, eos] + tokens
+        return Vocab(tokens, bos, eos, sep)
 
-    def tokenize(self,string):
+    def tokenize(self, string):
         """converts string to a list of tokens"""
-        tokens = list(filter(len,string.split(self.sep))) \
-                    if self.sep != '' else list(string)
+        tokens = list(filter(len,string.split(self.sep))) if self.sep != '' else list(string)
         return [self.bos] + tokens + [self.eos]
 
     def to_matrix(self, lines, max_len=None):
         """
-        convert variable length token sequences into  fixed size matrix
+        convert variable length token sequences into fixed size matrix
         example usage:
-        >>>print( as_matrix(words[:3],source_to_ix))
+        >>>print(as_matrix(words[:3], source_to_ix))
         [[15 22 21 28 27 13 -1 -1 -1 -1 -1]
          [30 21 15 15 21 14 28 27 13 -1 -1]
          [25 37 31 34 21 20 37 21 28 19 13]]

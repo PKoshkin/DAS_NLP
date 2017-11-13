@@ -2,7 +2,7 @@ import tensorflow as tf
 import keras.layers as L
 
 
-class BasicTranslationModel:
+class BasicLSTMTranslationModel:
     def __init__(self, name, inp_voc, out_voc,
                  emb_size, hid_size,):
         self.name = name
@@ -12,9 +12,9 @@ class BasicTranslationModel:
         with tf.variable_scope(name):
             self.emb_inp = L.Embedding(len(inp_voc), emb_size)
             self.emb_out = L.Embedding(len(out_voc), emb_size)
-            self.enc0 = tf.nn.rnn_cell.BasicRNNCell(hid_size)
+            self.enc0 = tf.nn.rnn_cell.LSTMCell(hid_size)
             self.dec_start = L.Dense(hid_size)
-            self.dec0 = tf.nn.rnn_cell.BasicRNNCell(hid_size)
+            self.dec0 = tf.nn.rnn_cell.LSTMCell(hid_size)
             self.logits = L.Dense(len(out_voc))
 
             # run on dummy output to .build all layers (and therefore create weights)

@@ -4,7 +4,7 @@ import keras.layers as L
 
 class BasicTranslationModel:
     def __init__(self, name, inp_voc, out_voc,
-                 emb_size, hid_size,):
+                 emb_size, hid_size):
         self.name = name
         self.inp_voc = inp_voc
         self.out_voc = out_voc
@@ -22,7 +22,7 @@ class BasicTranslationModel:
             out = tf.placeholder('int32', [None, None])
             h0 = self.encode(inp)
             h1 = self.decode(h0, out[:, 0])
-            # h2 = self.decode(h1,out[:,1]) etc.
+            # h2 = self.decode(h1, out[:, 1]) etc.
 
         self.weights = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, scope=name)
 
